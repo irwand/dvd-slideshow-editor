@@ -27,6 +27,7 @@ import tempfile
 import logging
 import subprocess
 import shutil
+import time
 from logging import debug, warn, info
 import wx
 import wx.lib.newevent
@@ -49,7 +50,8 @@ ID_POPUP_DELEFFECT = wx.NewId()
 ID_POPUP_EDIT = wx.NewId()
 ID_POPUP_ADDPICTURES = wx.NewId()
 ID_POPUP_ADDSONGS = wx.NewId()
-ID_POPUP_PREVIEW = wx.NewId()
+ID_POPUP_LQPREVIEW = wx.NewId()
+ID_POPUP_HQPREVIEW = wx.NewId()
 ID_POPUP_USEEDITOR = wx.NewId()
 
 # file dialog wildcard
@@ -136,7 +138,7 @@ class PictureControl(wx.Control):
       dc.SetPen(wx.Pen(self.boxColour[id], 1, wx.SOLID))
       dc.DrawRectangle(x,y,w,h)
 
-      # should we put the number on the rectangle?
+      # should we put the number or some description on the rectangle?
       # dc.SetTextForeground(self.textFG)
       # dc.DrawText(str(id),(x+w)/2,y)
 
@@ -236,7 +238,7 @@ class PictureControl(wx.Control):
          # using the absolute coordinate
          x0,y0 = p[0].split(',')
          x1,y1 = p[1].split(',')
-         self.boxSelection.append(((int(x0) + self.offsetToRealImage[0],int(y0) + offsetToRealImage[1]),\
+         self.boxSelection.append(((int(x0) + self.offsetToRealImage[0],int(y0) + self.offsetToRealImage[1]),\
             (int(x1)-int(x0),int(y1)-int(y0))))
       else:
          # using keyword description in this block
@@ -271,18 +273,18 @@ class PictureControl(wx.Control):
          else:
             # decode word location
             if p[1].endswith('left'):
-               x_offset = 0 + self.offsetToRealImage[0]
+               x_offset = 0
             elif p[1].endswith('right'):
-               x_offset = self.pictDimension[0] - w + self.offsetToRealImage[0]
+               x_offset = self.image.GetWidth() - w
             else:
-               x_offset = ((self.pictDimension[0] - w) / 2) + self.offsetToRealImage[0]
+               x_offset = (self.image.GetWidth() - w)/2
 
             if p[1].startswith('top'):
-               y_offset = 0 + self.offsetToRealImage[1]
+               y_offset = 0
             elif p[1].startswith('bottom'):
-               y_offset = self.pictDimension[1] - h + self.offsetToRealImage[1]
+               y_offset = self.image.GetHeight() - h
             else:
-               y_offset = ((self.pictDimension[1] - h) / 2) + self.offsetToRealImage[1]
+               y_offset = (self.image.GetHeight() - h)/2
 
          self.boxSelection.append([(x_offset, y_offset), (w,h)])
 
@@ -353,9 +355,9 @@ class PictureControl(wx.Control):
 
          # now deal with the position.
          # we prefer using the positional keyword rather than percent. So calculate that first
-         topLeftCoord = self.translateCoordinateRealPictToPanel(0,0)
-         middleCoord = self.translateCoordinateRealPictToPanel(self.pictDimension[0]/2,self.pictDimension[1]/2)
-         bottomRightCoord = self.translateCoordinateRealPictToPanel(self.pictDimension[0],self.pictDimension[1])
+         topLeftCoord = self.translateCoordinateImageToPanel(0,0)
+         middleCoord = self.translateCoordinateImageToPanel(self.image.GetWidth()/2,self.image.GetHeight()/2)
+         bottomRightCoord = self.translateCoordinateImageToPanel(self.image.GetWidth(),self.image.GetHeight())
          if withinTolerance(x, topLeftCoord[0], panelOnePercentDimension[0]) and \
                withinTolerance(y, topLeftCoord[1], panelOnePercentDimension[1]):
             x,y = topLeftCoord
@@ -566,22 +568,29 @@ class MainWindow(wx.Frame):
       menubar = wx.MenuBar()
       menubar.Append(menu, "&File")
 
-      menu = wx.Menu()
-      menu.Append(ID_EDITPREFS, "&Preferences...", "Edit preferences")
-      menubar.Append(menu, "&Edit")
+      # TODO: Dunno what should be in there just yet
+      #menu = wx.Menu()
+      #menu.Append(ID_EDITPREFS, "&Preferences...", "Edit preferences")
+      #wx.EVT_MENU(self, ID_EDITPREFS, self.onEditPreferences)
+      #menubar.Append(menu, "&Edit")
       self.SetMenuBar(menubar)
 
       self.popupMenu = wx.Menu()
-      self.popupMenu.Append(ID_POPUP_KENBURNS, "Add Random Kenburns")
-      self.popupMenu.Append(ID_POPUP_CROP, "Add Crop Effect")
-      self.popupMenu.Append(ID_POPUP_DELEFFECT, "Remove Picture Effect")
-      self.popupMenu.Append(ID_POPUP_EDIT, "Edit Line")
-      self.popupMenu.Append(ID_POPUP_PREVIEW, "Preview")
+      self.popupMenu.Append(ID_POPUP_KENBURNS, "Add Random Kenburns", "Selectively add random kenburns effect to selected lines")
+      self.popupMenu.Append(ID_POPUP_CROP, "Add Crop Effect", "Selectively add crop effect to selected lines")
+      self.popupMenu.Append(ID_POPUP_DELEFFECT, "Remove Picture Effect", "Remove all picture effect from the selected lines")
+      self.popupMenu.Append(ID_POPUP_EDIT, "Edit Line", "Edit currently focused line")
       self.popupMenu.AppendSeparator()
-      self.popupMenu.Append(ID_POPUP_ADDPICTURES, "Add Pictures...")
-      self.popupMenu.Append(ID_POPUP_ADDSONGS, "Add Songs...")
+      self.popupMenu.Append(ID_POPUP_LQPREVIEW, "Low Quality Preview", "Preview selected lines")
+      self.popupMenu.Append(ID_POPUP_HQPREVIEW, "High Quality Preview", "Preview selected lines (slow compile)")
       self.popupMenu.AppendSeparator()
       self.popupMenu.Append(ID_POPUP_USEEDITOR, "Launch Default Editor...")
+
+      # TODO: Still trying to figure out the semantics
+      #self.popupMenu.Append(ID_POPUP_ADDPICTURES, "Add Pictures...")
+      #self.popupMenu.Append(ID_POPUP_ADDSONGS, "Add Songs...")
+      #wx.EVT_MENU(self, ID_POPUP_ADDPICTURES, self.onAddPicts)
+      #wx.EVT_MENU(self, ID_POPUP_ADDSONGS, self.onAddSongs)
 
       # event binding
       wx.EVT_MENU(self, ID_NEWFILE, self.onNewFile)
@@ -590,15 +599,13 @@ class MainWindow(wx.Frame):
       wx.EVT_MENU(self, ID_SAVEAS, self.onSaveAs)
       wx.EVT_MENU(self, ID_EXIT, self.onExit)
       wx.EVT_MENU(self, ID_GENERATESLIDESHOW, self.onGenerateSlideshow)
-      wx.EVT_MENU(self, ID_EDITPREFS, self.onEditPreferences)
 
       wx.EVT_MENU(self, ID_POPUP_KENBURNS, self.onAddKenburns)
       wx.EVT_MENU(self, ID_POPUP_CROP, self.onAddCrop)
       wx.EVT_MENU(self, ID_POPUP_DELEFFECT, self.onDelEffect)
       wx.EVT_MENU(self, ID_POPUP_EDIT, self.onEdit)
-      wx.EVT_MENU(self, ID_POPUP_PREVIEW, self.onPreview)
-      wx.EVT_MENU(self, ID_POPUP_ADDPICTURES, self.onAddPicts)
-      wx.EVT_MENU(self, ID_POPUP_ADDSONGS, self.onAddSongs)
+      wx.EVT_MENU(self, ID_POPUP_LQPREVIEW, self.onPreview)
+      wx.EVT_MENU(self, ID_POPUP_HQPREVIEW, self.onPreview)
       wx.EVT_MENU(self, ID_POPUP_USEEDITOR, self.onUseEditor)
 
       self.Bind(wx.EVT_CLOSE, self.onCloseWindow)
@@ -631,7 +638,9 @@ class MainWindow(wx.Frame):
             event.Veto()
             return
 
+      print 'detecting tempdir'
       if hasattr(self, 'tempdir'):
+         print 'removing tempdir'
          shutil.rmtree(self.tempdir, True) # remove tempdir, ignore error
 
       # else, just destroy the window and user might lose changes
@@ -955,23 +964,21 @@ class MainWindow(wx.Frame):
    def onUseEditor(self, event):
       self.setUnsavedChanges(True)
 
-      # find a suitable editor
-      if 'VISUAL' in os.environ:
-         editor = os.environ['VISUAL']
-      elif 'EDITOR' in os.environ:
-         editor = os.environ['EDITOR']
-      else:
-         editor = 'vi'
-
       if not hasattr(self, 'tempdir'):
          self.tempdir = tempfile.mkdtemp(prefix='slideshow-editor-tmp')
+         debug('created tempdir: %s' % self.tempdir)
 
       tempFile = os.path.join(self.tempdir, os.path.basename(self.scriptPath))
+      debug('generating tempfile: %s' % tempFile)
       with open(tempFile, 'w') as f:
          f.writelines([self.constructScriptLine(i)+'\n' for i in range(self.scriptView.GetItemCount())])
 
-      debug('Execute: %s %s' % (editor, tempFile))
-      subprocess.call([editor, tempFile])
+      debug('Execute: %s %s' % ('xdg-open', tempFile))
+      subprocess.call(['xdg-open', tempFile])
+
+      dlg = wx.MessageDialog(self, "When you finish editing, please click OK", "Waiting for edit", wx.OK | wx.ICON_INFORMATION)
+      dlg.ShowModal()
+      dlg.Destroy()
 
       with open(tempFile) as f:
          script = f.readlines()
@@ -979,18 +986,74 @@ class MainWindow(wx.Frame):
 
       os.unlink(tempFile)
 
+   def execute_dvd_slideshow(self, args, dir):
+      # launch dvd-slideshow. The simplest way to do this that I can think
+      # of is executing this inside a new terminal, but which terminal to use?
+
+      if subprocess.call(['which', 'gnome-terminal']) == 0:
+         cmd = ['gnome-terminal', '-x', 'dvd-slideshow'] + args
+      elif subprocess.call(['which', 'konsole']) == 0:
+         cmd = ['konsole', '-x', 'dvd-slideshow'] + args
+      else:
+         dlg = wx.MessageDialog(self, "Failed to find a terminal to use.\nPlease install gnome-terminal or konsole.", "Can't find terminal", wx.OK | wx.ICON_ERROR)
+         dlg.ShowModal()
+         dlg.Destroy()
+         return
+
+      info('launching: %s' % cmd)
+      retcode = subprocess.call(cmd, cwd=dir)
+      time.sleep(1) # don't know why this is needed. Otherwise the terminal doesn't get launched
+
    def onPreview(self, event):
-      pass
-   def onAddPicts(self, event):
-      self.setUnsavedChanges(True)
-      pass
-   def onAddSongs(self, event):
-      self.setUnsavedChanges(True)
-      pass
-   def onEditPreferences(self, event):
-      pass
+      debug( event.GetId() == ID_POPUP_HQPREVIEW)
+
+      # detect if we have mplayer
+      if subprocess.call(['which', 'mplayer']) != 0:
+         dlg = wx.MessageDialog(self, "Failed to find mplayer for the preview.\nPlease install mplayer to use this feature", "Can't find mplayer", wx.OK | wx.ICON_ERROR)
+         dlg.ShowModal()
+         dlg.Destroy()
+         return
+
+      if not hasattr(self, 'tempdir'):
+         self.tempdir = tempfile.mkdtemp(prefix='slideshow-editor-tmp')
+         debug('created tempdir: %s' % self.tempdir)
+
+      tempFile = os.path.join(self.tempdir, os.path.basename(self.scriptPath))
+      debug('generating tempfile: %s' % tempFile)
+
+      with open(tempFile, 'w') as f:
+         f.writelines([self.constructScriptLine(i)+'\n' for i in range(self.scriptView.GetItemCount()) if self.scriptView.GetItemState(i, wx.LIST_STATE_SELECTED)])
+
+      self.execute_dvd_slideshow([('-L', '-H')[event.GetId() == ID_POPUP_HQPREVIEW], '-f', tempFile], self.tempdir)
+
+      # now call mplayer to view it
+      dlg = wx.MessageDialog(self, "Please click OK when dvd-slideshow is done", "Waiting for dvd-slideshow", wx.OK | wx.ICON_INFORMATION)
+      isPreviewAgain = dlg.ShowModal()
+      dlg.Destroy()
+      while isPreviewAgain == wx.ID_OK:
+         subprocess.call(['mplayer', '-sid', '0', '-nofs', '%s.vob' % (os.path.splitext(tempFile)[0])])
+         dlg = wx.MessageDialog(self, "Preview again?", "Preview again", wx.OK | wx.CANCEL | wx.ICON_QUESTION)
+         isPreviewAgain = dlg.ShowModal()
+         dlg.Destroy()
+
    def onGenerateSlideshow(self, event):
-      pass
+      if self.isUnsavedChanges:
+         dlg = wx.MessageDialog(self, "Script is not saved. Please save it first before generating slideshow.", "Unsaved changes detected", wx.OK | wx.ICON_ERROR)
+         dlg.ShowModal()
+         dlg.Destroy()
+         return
+
+      self.execute_dvd_slideshow(['-H', '-f', self.scriptPath], os.path.dirname(self.scriptPath))
+
+   # TODO
+   #def onAddPicts(self, event):
+   #   self.setUnsavedChanges(True)
+   #   pass
+   #def onAddSongs(self, event):
+   #   self.setUnsavedChanges(True)
+   #   pass
+   #def onEditPreferences(self, event):
+   #   pass
 
 def parseOptions(argv):
    """
