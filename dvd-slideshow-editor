@@ -1,5 +1,5 @@
-#!/usr/bin/python
-#    dvd-slideshow-gui.py
+#!/usr/bin/env python
+#    dvd-slideshow-editor
 #    Copyright 2010-2010 Irwan Djajadi  <irwan at djajadi.net>
 #
 #    This program is free software; you can redistribute it and/or modify
@@ -29,8 +29,14 @@ import subprocess
 import shutil
 import time
 from logging import debug, warn, info
+import wxversion
+wxversion.select("2.8")
 import wx
 import wx.lib.newevent
+from wx.lib.wordwrap import wordwrap
+
+ProgName = 'dvd-slideshow-editor'
+ProgVersion = '0.5'
 
 # custom event
 PictureControlDragEvent, EVT_PICTURE_CONTROL_DRAG_EVENT = wx.lib.newevent.NewEvent()
@@ -43,6 +49,7 @@ ID_NEWFILE = wx.NewId()
 ID_OPENFILE = wx.NewId()
 ID_GENERATESLIDESHOW = wx.NewId()
 ID_EDITPREFS = wx.NewId()
+ID_USAGE = wx.NewId()
 
 ID_POPUP_KENBURNS = wx.NewId()
 ID_POPUP_CROP = wx.NewId()
@@ -74,14 +81,6 @@ def getImageFromScriptLine(line):
    else:
       return None
 
-class TextCtrlFile(file):
-   def __init__(self, ctrl):
-      self.ctrl = ctrl
-   def write(self, text):
-      self.ctrl.write(text)
-   def flush(self):
-      pass
-
 
 class PictureControl(wx.Control):
 
@@ -93,9 +92,6 @@ class PictureControl(wx.Control):
 
       self.eventTarget = eventTarget
       # Bind events
-      self.Bind(wx.EVT_PAINT, self.onPaint)
-      self.Bind(wx.EVT_ERASE_BACKGROUND, self.onEraseBackground)
-      self.Bind(wx.EVT_SIZE, self.onResize)
       self.pictPath = None
       self.image = None
       self.desiredAspect = (4.0/3, 16.0/9)[bool(isWidescreen)]
@@ -105,7 +101,13 @@ class PictureControl(wx.Control):
       self.boxColour = [wx.Colour(255,255,255), wx.Colour(0,255,125)]
       self.textFG = wx.Colour(255,255,255)
 
-      self._leftclicked = False # end of clicking
+      # this below is a bit annoying. I suppose we'll just use the help window for explanation.
+      # self.SetToolTip(wx.ToolTip("alt: no snap, ctrl+alt: freeform"))
+
+      self.Bind(wx.EVT_PAINT, self.onPaint)
+      self.Bind(wx.EVT_ERASE_BACKGROUND, self.onEraseBackground)
+      self.Bind(wx.EVT_SIZE, self.onResize)
+
       wx.EVT_LEFT_DOWN(self, self.onMouseEvent)
       wx.EVT_LEFT_UP(self, self.onMouseEvent)
       wx.EVT_MOTION(self, self.onMouseEvent)
@@ -259,7 +261,7 @@ class PictureControl(wx.Control):
             w = self.pictDimension[0]
             h = int(w / self.desiredAspect)
          else:
-            info("WARNING: don't know how to parse crop/kenburns parameter: %s" % param)
+            warning("WARNING: don't know how to parse crop/kenburns parameter: %s" % param)
             return
 
          # decode frame_location
@@ -545,16 +547,6 @@ class MainWindow(wx.Frame):
       self.SetAutoLayout(1)
       self.overallSizer.Fit(self)
 
-      # configure logging after we created the text window
-      if options.verbose:
-         logLevel = logging.DEBUG
-      else:
-         logLevel = logging.INFO
-      logging.basicConfig(level = logLevel,
-                           format='%(asctime)s %(message)s',
-                           datefmt='%d %b %Y %H:%M:%S',
-                           stream=TextCtrlFile(self.text))
-
       # menu
       menu = wx.Menu()
       menu.Append(ID_NEWFILE, "&New", "Start with a new script")
@@ -573,6 +565,11 @@ class MainWindow(wx.Frame):
       #menu.Append(ID_EDITPREFS, "&Preferences...", "Edit preferences")
       #wx.EVT_MENU(self, ID_EDITPREFS, self.onEditPreferences)
       #menubar.Append(menu, "&Edit")
+
+      menu = wx.Menu()
+      menu.Append(ID_USAGE, "About/&Usage", "Display about box containing usage info")
+      wx.EVT_MENU(self, ID_USAGE, self.onUsage)
+      menubar.Append(menu, "&Help")
       self.SetMenuBar(menubar)
 
       self.popupMenu = wx.Menu()
@@ -638,9 +635,7 @@ class MainWindow(wx.Frame):
             event.Veto()
             return
 
-      print 'detecting tempdir'
       if hasattr(self, 'tempdir'):
-         print 'removing tempdir'
          shutil.rmtree(self.tempdir, True) # remove tempdir, ignore error
 
       # else, just destroy the window and user might lose changes
@@ -695,7 +690,7 @@ class MainWindow(wx.Frame):
          # Show the dialog and retrieve the user response. If it is the OK response,
          # process the data.
          if dlg.ShowModal() == wx.ID_OK:
-            info('Opening dvd-slideshow script: %s' % self.scriptPath)
+            debug('Opening dvd-slideshow script: %s' % self.scriptPath)
             self.setScriptPathAndLoad(dlg.GetPath())
 
          dlg.Destroy()
@@ -716,7 +711,7 @@ class MainWindow(wx.Frame):
       # process the data.
       if dlg.ShowModal() == wx.ID_OK:
          self.scriptPath = dlg.GetPath()
-         info('Saving dvd-slideshow script as %s' % self.scriptPath)
+         debug('Saving dvd-slideshow script as %s' % self.scriptPath)
          self.onSave(event)
 
       dlg.Destroy()
@@ -1000,7 +995,7 @@ class MainWindow(wx.Frame):
          dlg.Destroy()
          return
 
-      info('launching: %s' % cmd)
+      debug('launching: %s' % cmd)
       retcode = subprocess.call(cmd, cwd=dir)
       time.sleep(1) # don't know why this is needed. Otherwise the terminal doesn't get launched
 
@@ -1044,6 +1039,28 @@ class MainWindow(wx.Frame):
          return
 
       self.execute_dvd_slideshow(['-H', '-f', self.scriptPath], os.path.dirname(self.scriptPath))
+      time.sleep(5) # don't know why this is needed. Otherwise the terminal doesn't get launched
+      dlg = wx.MessageDialog(self, "Please click OK when dvd-slideshow is done", "Waiting for dvd-slideshow", wx.OK | wx.ICON_INFORMATION)
+      dlg.ShowModal()
+      dlg.Destroy()
+
+   def onUsage(self, event):
+      info = wx.AboutDialogInfo()
+      info.Name = ProgName
+      info.Version = ProgVersion
+      info.Copyright = "(C) 2010 dvd-slideshow-editor's contributors"
+      info.Description = wordwrap(
+            "A GUI editor for dvd-slideshow script.\n\nUsage:\n\n"
+            "Left pane contains the raw script. You can edit this directly, and your change will be reflected on the right pane\n\n"
+            "Right pane contains the sample picture and the effect bounding box. You can move and resize the box(es). By default, this will use keyword snap. Hold down alt for no snap. Hold down ctrl and alt for no snap and no aspect ratio\n",
+            350, wx.ClientDC(self))
+
+      info.WebSite = ("http://code.google.com/p/dvd-slideshow-editor/", "dvd-slideshow-editor project page")
+
+      info.License = "http://www.gnu.org/licenses/gpl.html"
+
+      # Then we call wx.AboutBox giving it that info object
+      wx.AboutBox(info)
 
    # TODO
    #def onAddPicts(self, event):
@@ -1060,7 +1077,7 @@ def parseOptions(argv):
    Given parse command line, return a tuple containing the options selected by user
    """
    # build option parser
-   optParser = optparse.OptionParser(prog = argv[0], description = "GUI for dvd-slideshow script", usage = "usage: %prog [options] [dvd-slideshow-script]")
+   optParser = optparse.OptionParser(prog = ProgName, description = "GUI editor for dvd-slideshow script", usage = "usage: %prog [options] [dvd-slideshow-script]")
    optParser.add_option("-w", "--widescreen", action = "store_true", help = "widescreen (16:9). Default: 4.3")
    optParser.add_option("-v", "--verbose", action = "store_true", help = "verbose prints for debugging")
 
@@ -1087,6 +1104,14 @@ def main(argv = None):
       argv = sys.argv
 
    (options, scriptPath) = parseOptions(argv)
+
+   if options.verbose:
+      logLevel = logging.DEBUG
+   else:
+      logLevel = logging.INFO
+   logging.basicConfig(level = logLevel,
+                        format='%(asctime)s %(message)s',
+                        datefmt='%d %b %Y %H:%M:%S')
 
    random.seed()
 
