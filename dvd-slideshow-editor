@@ -518,9 +518,8 @@ class MainWindow(wx.Frame):
       self.imageDimensionList = []
 
       # setup and create child windows
-      self.hsplitter = wx.SplitterWindow(self, 1, style=wx.SP_3D)
 
-      self.vsplitter = wx.SplitterWindow(self.hsplitter, 2, style=wx.SP_3D)
+      self.vsplitter = wx.SplitterWindow(self, 2, style=wx.SP_3D)
       self.leftSizer = wx.BoxSizer(wx.VERTICAL)
       self.rightSizer = wx.BoxSizer(wx.VERTICAL)
       self.scriptView = wx.ListCtrl(self.vsplitter, 4, style = wx.LC_REPORT | wx.LC_EDIT_LABELS | wx.LC_NO_HEADER)
@@ -531,21 +530,10 @@ class MainWindow(wx.Frame):
       self.rightSizer.Add(self.imagePanel, 1, wx.EXPAND)
       self.vsplitter.SetMinimumPaneSize(20)
 
-      self.text = wx.TextCtrl(self.hsplitter, 6, style=wx.TE_MULTILINE)
-      self.topSizer = wx.BoxSizer(wx.VERTICAL)
-      self.bottomSizer = wx.BoxSizer(wx.VERTICAL)
-      self.vsplitter.SetSizer(self.topSizer)
-      self.topSizer.Add(self.vsplitter, 1, wx.EXPAND)
-      self.text.SetSizer(self.bottomSizer)
-      self.bottomSizer.Add(self.text)
-      self.hsplitter.SetMinimumPaneSize(20)
-      self.hsplitter.SplitHorizontally(self.vsplitter, self.text, -100)
-
-      self.overallSizer = wx.BoxSizer(wx.VERTICAL)
-      self.overallSizer.Add(self.hsplitter, 1, wx.EXPAND)
+      self.overallSizer = wx.BoxSizer(wx.HORIZONTAL)
+      self.overallSizer.Add(self.vsplitter, 1, wx.EXPAND)
       self.SetSizer(self.overallSizer)
       self.SetAutoLayout(1)
-      self.overallSizer.Fit(self)
 
       # menu
       menu = wx.Menu()
@@ -626,6 +614,7 @@ class MainWindow(wx.Frame):
 
       # finalize window sizes and display it
       self.vsplitter.SplitVertically(self.scriptView, self.imagePanel, 300)
+      self.overallSizer.Fit(self)
       self.SetSize(wx.Size(1024, 700)) # TODO: get this setting from last invocation
       self.Show(True)
 
