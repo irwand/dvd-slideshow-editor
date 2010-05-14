@@ -748,7 +748,6 @@ class MainWindow(wx.Frame):
       self.scriptView.SetImageList(self.imageList, wx.IMAGE_LIST_SMALL)
 
       self.scriptView.InsertColumn(0, "image")
-      self.scriptView.InsertColumn(1, "line")
 
       # populate scriptView
       for i,line in enumerate(script):
@@ -768,8 +767,7 @@ class MainWindow(wx.Frame):
             info.SetText(line)
             self.scriptView.InsertItem(info)
 
-      self.scriptView.SetColumnWidth(0, wx.LIST_AUTOSIZE)
-      self.scriptView.SetColumnWidth(1, wx.LIST_AUTOSIZE)
+      self.scriptView.SetColumnWidth(0, 1000)
 
    def onScriptViewDrag(self, event):
       data = wx.TextDataObject()
